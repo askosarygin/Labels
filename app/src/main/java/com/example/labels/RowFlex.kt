@@ -2,6 +2,8 @@ package com.example.labels
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.*
@@ -17,18 +19,28 @@ fun RowFlex(
     maxLinesWhenHidden: Int = 1,
     amountVisibleElementsWhenHidden: ((Int) -> Unit)? = null,
     isExpanded: Boolean = true,
-    expandButton: @Composable (() -> Unit),
-    shrinkButton: @Composable (() -> Unit),
+    expandButton: @Composable (() -> Unit)? = null,
+    shrinkButton: @Composable (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    if (expandButton != null && shrinkButton == null) {
+        throw RuntimeException("Определите shrinkButton")
+    }
+    if (expandButton == null && shrinkButton != null) {
+        throw RuntimeException("Определите expandButton")
+    }
+
+    val buttonsAdded by remember {
+        mutableStateOf(expandButton != null)
+    }
     Box(modifier = modifier) {
         Layout(
             content = {
                 content()
-                if (isExpanded) {
+                if (shrinkButton != null && isExpanded) {
                     shrinkButton()
                 }
-                if (!isExpanded) {
+                if (expandButton != null && !isExpanded) {
                     expandButton()
                 }
             },
@@ -37,7 +49,8 @@ fun RowFlex(
                 horizontalSpace,
                 maxLinesWhenHidden,
                 amountVisibleElementsWhenHidden,
-                isExpanded
+                isExpanded,
+                buttonsAdded
             )
         )
     }
@@ -49,7 +62,8 @@ private fun rowFlexMeasurePolicy(
     horizontalSpace: Dp = 0.dp,
     maxLinesWhenHidden: Int = 1,
     amountVisibleElementsWhenHidden: ((Int) -> Unit)?,
-    isExpanded: Boolean = true
+    isExpanded: Boolean = true,
+    buttonsAdded: Boolean
 ): MeasurePolicy {
     return remember(
         key1 = verticalSpace,
@@ -64,7 +78,8 @@ private fun rowFlexMeasurePolicy(
                 verticalSpace,
                 horizontalSpace,
                 maxLinesWhenHidden,
-                isExpanded
+                isExpanded,
+                buttonsAdded
             )
 
             if (amountVisibleElementsWhenHidden != null && !isExpanded) {
@@ -80,9 +95,9 @@ private fun rowFlexMeasurePolicy(
                     maxOf(positions.maxOf { it.maxYCoordinate }, constraints.minHeight),
                     constraints.maxHeight
                 )
-            //todo    Если высчитать height так как внизу, почему то не все элементы влезают,
-            // если ниже есть еще что то(набор тестовых кнопок например), что за фигня,
-            // при верхнем варианте всё работает как надо, но не понятно как
+                //todo    Если высчитать height так как внизу, почему то не все элементы влезают,
+                // если ниже есть еще что то(набор тестовых кнопок например), что за фигня,
+                // при верхнем варианте всё работает как надо, но не понятно как
 
 //                height = maxOf(positions.maxOf { it.maxYCoordinate }, constraints.minHeight)
             }
@@ -99,10 +114,11 @@ private fun rowFlexMeasurePolicy(
 private fun MeasureScope.getRelativePositions(
     measurables: List<Measurable>,
     constraints: Constraints,
-    verticalSpace: Dp = 0.dp,
-    horizontalSpace: Dp = 0.dp,
-    maxLinesWhenHidden: Int = 1,
-    isExpanded: Boolean = true
+    verticalSpace: Dp,
+    horizontalSpace: Dp,
+    maxLinesWhenHidden: Int,
+    isExpanded: Boolean,
+    buttonsAdded: Boolean
 ): List<PlaceablePosition> {
     val result = mutableListOf<PlaceablePosition>()
     var x = 0
@@ -110,7 +126,7 @@ private fun MeasureScope.getRelativePositions(
     var maxHeight = -1
     var busyLinesCounter = 0
 
-    if (measurables.size <= 1) {
+    if (measurables.size <= if (buttonsAdded) 1 else 0) {
         return result
     }
 
@@ -123,12 +139,12 @@ private fun MeasureScope.getRelativePositions(
             y += maxHeight + verticalSpace.roundToPx()
             maxHeight = -1
 
-            if (index == measurables.lastIndex && busyLinesCounter <= maxLinesWhenHidden) {
+            if (buttonsAdded && index == measurables.lastIndex && busyLinesCounter <= maxLinesWhenHidden) {
                 return result
             }
         }
 
-        if (index == measurables.lastIndex && busyLinesCounter < maxLinesWhenHidden) {
+        if (buttonsAdded && index == measurables.lastIndex && busyLinesCounter < maxLinesWhenHidden) {
             return result
         }
 
